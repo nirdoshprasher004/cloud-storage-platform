@@ -33,54 +33,55 @@ export default function DrivePage() {
   const [shareExpiry, setShareExpiry] = useState('')
 
   useEffect(() => {
-    loadFolderContents()
+    checkAuthAndLoadFiles()
   }, [currentFolder])
 
-  const loadFolderContents = async () => {
+  const checkAuthAndLoadFiles = async () => {
     try {
-      const token = localStorage.getItem('access_token')
-      if (!token) {
+      // Import supabase client
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
         window.location.href = '/auth'
         return
       }
 
-      const response = await fetch(`http://localhost:3003/api/folders/${currentFolder}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      // For now, show some mock data since we're using Supabase auth only
+      // In a full implementation, you'd fetch from Supabase database
+      const mockItems: FileItem[] = [
+        {
+          id: '1',
+          name: 'Documents',
+          type: 'folder',
+          modifiedAt: new Date().toISOString(),
+          owner: 'You',
+          isStarred: false,
+          isShared: false
+        },
+        {
+          id: '2',
+          name: 'Welcome.pdf',
+          type: 'file',
+          size: 1024000,
+          mimeType: 'application/pdf',
+          modifiedAt: new Date().toISOString(),
+          owner: 'You',
+          isStarred: true,
+          isShared: false
         }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const allItems: FileItem[] = [
-          ...data.children.folders.map((folder: any) => ({
-            id: folder.id,
-            name: folder.name,
-            type: 'folder' as const,
-            modifiedAt: folder.updated_at,
-            owner: 'You',
-            isStarred: false,
-            isShared: false
-          })),
-          ...data.children.files.map((file: any) => ({
-            id: file.id,
-            name: file.name,
-            type: 'file' as const,
-            size: file.size_bytes,
-            mimeType: file.mime_type,
-            modifiedAt: file.updated_at,
-            owner: 'You',
-            isStarred: false,
-            isShared: false
-          }))
-        ]
-        setItems(allItems)
-      } else if (response.status === 401) {
-        localStorage.removeItem('access_token')
-        window.location.href = '/auth'
-      }
+      ]
+      
+      setItems(mockItems)
     } catch (error) {
-      console.error('Error loading folder contents:', error)
+      console.error('Error checking auth:', error)
+      window.location.href = '/auth'
     } finally {
       setLoading(false)
     }
@@ -96,87 +97,34 @@ export default function DrivePage() {
   }
 
   const handleItemAction = async (action: string, item: FileItem) => {
-    const token = localStorage.getItem('access_token')
-    
     switch (action) {
       case 'star':
-        try {
-          await fetch('http://localhost:3003/api/stars', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              resourceType: item.type,
-              resourceId: item.id
-            })
-          })
-          loadFolderContents() // Refresh
-        } catch (error) {
-          console.error('Error starring item:', error)
-        }
+        // Update local state for demo
+        setItems(items.map(i => 
+          i.id === item.id ? { ...i, isStarred: !i.isStarred } : i
+        ))
         break
       
       case 'delete':
         if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
-          try {
-            const endpoint = item.type === 'folder' ? 'folders' : 'files'
-            await fetch(`http://localhost:3003/api/${endpoint}/${item.id}`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            })
-            loadFolderContents() // Refresh
-          } catch (error) {
-            console.error('Error deleting item:', error)
-          }
+          // Remove from local state for demo
+          setItems(items.filter(i => i.id !== item.id))
         }
         break
       
       case 'rename':
         const newName = prompt('Enter new name:', item.name)
         if (newName && newName !== item.name) {
-          try {
-            const endpoint = item.type === 'folder' ? 'folders' : 'files'
-            await fetch(`http://localhost:3003/api/${endpoint}/${item.id}`, {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({ name: newName })
-            })
-            loadFolderContents() // Refresh
-          } catch (error) {
-            console.error('Error renaming item:', error)
-          }
+          // Update local state for demo
+          setItems(items.map(i => 
+            i.id === item.id ? { ...i, name: newName } : i
+          ))
         }
         break
       
       case 'download':
         if (item.type === 'file') {
-          try {
-            const response = await fetch(`http://localhost:3003/api/files/${item.id}/download`, {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            })
-            
-            if (response.ok) {
-              const data = await response.json()
-              // Create a temporary link to download the file
-              const link = document.createElement('a')
-              link.href = data.downloadUrl
-              link.download = data.filename
-              document.body.appendChild(link)
-              link.click()
-              document.body.removeChild(link)
-            }
-          } catch (error) {
-            console.error('Error downloading file:', error)
-          }
+          alert(`Download functionality will be available when backend is connected.`)
         }
         break
       
@@ -192,64 +140,38 @@ export default function DrivePage() {
   const createNewFolder = async () => {
     if (!newFolderName.trim()) return
 
-    try {
-      const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3003/api/folders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: newFolderName,
-          parentId: currentFolder === 'root' ? null : currentFolder
-        })
-      })
-
-      if (response.ok) {
-        setNewFolderName('')
-        setShowNewFolder(false)
-        loadFolderContents() // Refresh
-      }
-    } catch (error) {
-      console.error('Error creating folder:', error)
+    // Create mock folder for demo
+    const newFolder: FileItem = {
+      id: Date.now().toString(),
+      name: newFolderName,
+      type: 'folder',
+      modifiedAt: new Date().toISOString(),
+      owner: 'You',
+      isStarred: false,
+      isShared: false
     }
+
+    setItems([...items, newFolder])
+    setNewFolderName('')
+    setShowNewFolder(false)
   }
 
   const handleFileUpload = (files: FileList) => {
-    const uploadFiles = async () => {
-      try {
-        const token = localStorage.getItem('access_token')
-        const formData = new FormData()
-        
-        Array.from(files).forEach(file => {
-          formData.append('files', file)
-        })
-        
-        formData.append('folderId', currentFolder === 'root' ? '' : currentFolder)
-        
-        const response = await fetch('http://localhost:3003/api/files/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        })
-        
-        if (response.ok) {
-          const result = await response.json()
-          alert(`${result.files.length} files uploaded successfully!`)
-          loadFolderContents() // Refresh
-        } else {
-          const error = await response.json()
-          alert(`Upload failed: ${error.error}`)
-        }
-      } catch (error) {
-        console.error('Upload error:', error)
-        alert('Upload failed. Please try again.')
-      }
-    }
-    uploadFiles()
+    // Create mock files for demo
+    const newFiles: FileItem[] = Array.from(files).map(file => ({
+      id: Date.now().toString() + Math.random(),
+      name: file.name,
+      type: 'file' as const,
+      size: file.size,
+      mimeType: file.type,
+      modifiedAt: new Date().toISOString(),
+      owner: 'You',
+      isStarred: false,
+      isShared: false
+    }))
+
+    setItems([...items, ...newFiles])
+    alert(`${files.length} files uploaded successfully! (Demo mode - files are not actually stored)`)
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -279,70 +201,20 @@ export default function DrivePage() {
   const createUserShare = async () => {
     if (!shareItem || !shareEmail.trim()) return
 
-    try {
-      const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3003/api/shares', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          resourceType: shareItem.type,
-          resourceId: shareItem.id,
-          granteeEmail: shareEmail,
-          role: 'viewer'
-        })
-      })
-
-      if (response.ok) {
-        alert(`Successfully shared "${shareItem.name}" with ${shareEmail}`)
-        setShareEmail('')
-        setShowShareModal(false)
-      } else {
-        const error = await response.json()
-        alert(`Share failed: ${error.error}`)
-      }
-    } catch (error) {
-      console.error('Error creating share:', error)
-      alert('Share failed. Please try again.')
-    }
+    alert(`Successfully shared "${shareItem.name}" with ${shareEmail} (Demo mode)`)
+    setShareEmail('')
+    setShowShareModal(false)
   }
 
   const createLinkShare = async () => {
     if (!shareItem) return
 
-    try {
-      const token = localStorage.getItem('access_token')
-      const response = await fetch('http://localhost:3003/api/link-shares', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          resourceType: shareItem.type,
-          resourceId: shareItem.id,
-          password: sharePassword || null,
-          expiresAt: shareExpiry || null
-        })
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        navigator.clipboard.writeText(result.shareUrl)
-        alert(`Share link created and copied to clipboard!\n\nLink: ${result.shareUrl}`)
-        setSharePassword('')
-        setShareExpiry('')
-        setShowShareModal(false)
-      } else {
-        const error = await response.json()
-        alert(`Link share failed: ${error.error}`)
-      }
-    } catch (error) {
-      console.error('Error creating link share:', error)
-      alert('Link share failed. Please try again.')
-    }
+    const mockShareUrl = `https://your-app.vercel.app/share/${shareItem.id}`
+    navigator.clipboard.writeText(mockShareUrl)
+    alert(`Share link created and copied to clipboard!\n\nLink: ${mockShareUrl}\n\n(Demo mode - link is not functional)`)
+    setSharePassword('')
+    setShareExpiry('')
+    setShowShareModal(false)
   }
 
   if (loading) {

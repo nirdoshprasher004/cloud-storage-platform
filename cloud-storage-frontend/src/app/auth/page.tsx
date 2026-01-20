@@ -20,46 +20,48 @@ export default function AuthPage() {
     setMessage('')
 
     try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register'
-      const body = isLogin 
-        ? { email, password }
-        : { email, password, name }
+      // Import supabase client
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003/api'
-      const baseUrl = apiUrl.replace('/api', '')
-      
-      const response = await fetch(`${baseUrl}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      })
+      if (isLogin) {
+        // Login with Supabase
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        if (isLogin && data.session) {
-          localStorage.setItem('access_token', data.session.access_token)
+        if (error) {
+          setMessage(error.message)
+        } else if (data.session) {
           setMessage('Login successful! Redirecting...')
           setTimeout(() => {
             window.location.href = '/drive'
           }, 1000)
-        } else if (!isLogin && data.emailConfirmationRequired) {
-          setMessage('Registration successful! Please check your email to confirm your account before logging in.')
-        } else if (!isLogin && data.session) {
-          localStorage.setItem('access_token', data.session.access_token)
-          setMessage('Registration successful! Redirecting...')
-          setTimeout(() => {
-            window.location.href = '/drive'
-          }, 1000)
-        } else {
-          setMessage(`${isLogin ? 'Login' : 'Registration'} successful!`)
         }
       } else {
-        setMessage(data.error || 'Something went wrong')
+        // Register with Supabase
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name: name,
+            }
+          }
+        })
+
+        if (error) {
+          setMessage(error.message)
+        } else if (data.user) {
+          setMessage('Registration successful! Please check your email to confirm your account.')
+        }
       }
     } catch (error) {
+      console.error('Auth error:', error)
       setMessage('Network error. Please try again.')
     } finally {
       setLoading(false)

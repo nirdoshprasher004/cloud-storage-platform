@@ -39,10 +39,22 @@ export function Header({ viewMode, onViewModeChange, searchQuery, onSearchChange
     setShowUserMenu(!showUserMenu)
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('Sign out?')) {
-      localStorage.removeItem('access_token')
-      router.push('/auth')
+      try {
+        // Import supabase client
+        const { createClient } = await import('@supabase/supabase-js')
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+        
+        await supabase.auth.signOut()
+        router.push('/auth')
+      } catch (error) {
+        console.error('Logout error:', error)
+        router.push('/auth')
+      }
     }
     setShowUserMenu(false)
   }
