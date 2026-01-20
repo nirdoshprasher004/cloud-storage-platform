@@ -42,14 +42,18 @@ export function Header({ viewMode, onViewModeChange, searchQuery, onSearchChange
   const handleLogout = async () => {
     if (confirm('Sign out?')) {
       try {
-        // Import supabase client
-        const { createClient } = await import('@supabase/supabase-js')
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
+        // Check if environment variables are available
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+        if (supabaseUrl && supabaseAnonKey) {
+          // Import supabase client
+          const { createClient } = await import('@supabase/supabase-js')
+          const supabase = createClient(supabaseUrl, supabaseAnonKey)
+          
+          await supabase.auth.signOut()
+        }
         
-        await supabase.auth.signOut()
         router.push('/auth')
       } catch (error) {
         console.error('Logout error:', error)

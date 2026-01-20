@@ -38,12 +38,19 @@ export default function DrivePage() {
 
   const checkAuthAndLoadFiles = async () => {
     try {
+      // Check if environment variables are available
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error('Missing Supabase environment variables')
+        window.location.href = '/auth'
+        return
+      }
+
       // Import supabase client
       const { createClient } = await import('@supabase/supabase-js')
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
+      const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
       // Check if user is authenticated
       const { data: { session } } = await supabase.auth.getSession()

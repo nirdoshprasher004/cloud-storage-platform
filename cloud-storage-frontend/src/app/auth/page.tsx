@@ -20,12 +20,19 @@ export default function AuthPage() {
     setMessage('')
 
     try {
+      // Check if environment variables are available
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        setMessage('Configuration error: Supabase environment variables are missing. Please check deployment settings.')
+        console.error('Missing environment variables:', { supabaseUrl, supabaseAnonKey })
+        return
+      }
+
       // Import supabase client
       const { createClient } = await import('@supabase/supabase-js')
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
+      const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
       if (isLogin) {
         // Login with Supabase
