@@ -25,7 +25,10 @@ export default function AuthPage() {
         ? { email, password }
         : { email, password, name }
 
-      const response = await fetch(`http://localhost:3003${endpoint}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003/api'
+      const baseUrl = apiUrl.replace('/api', '')
+      
+      const response = await fetch(`${baseUrl}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
